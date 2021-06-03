@@ -9,6 +9,7 @@
 #include <GLFW/glfw3.h>
 #include "shader_s.h"
 #include <hhx_camera_1.0.h>
+#include <texture_loader.h>
 
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -29,7 +30,7 @@
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
-Shader *computeShader, *drawShader, *drawWireframeShader;
+Shader *drawShader, *histogramComputeShader;
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
@@ -96,6 +97,61 @@ void createSSBO(GLuint &newSSBO, const int memSize, const int bindingIndex, void
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingIndex, newSSBO);
 
 	glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+}
+
+unsigned int loadTexture2D(float const *data, const int nrComponents, const glm::ivec2 size, GLenum clamp = GL_REPEAT)
+{
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	unsigned int textureID;
+	glGenTextures(1, &textureID);
+
+	GLenum format;
+	if (nrComponents == 1)
+		format = GL_RED;
+	else if (nrComponents == 3)
+		format = GL_RGB;
+	else if (nrComponents == 4)
+		format = GL_RGBA;
+
+	glBindTexture(GL_TEXTURE_2D, textureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, format, size.x, size.y, 0, format, GL_FLOAT, data);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // disables mipmap level!
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	return textureID;
+}
+
+unsigned int loadTexture3D(float const *data, const int nrComponents, const glm::ivec3 size, GLenum clamp = GL_REPEAT)
+{
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	unsigned int textureID;
+	glGenTextures(1, &textureID);
+
+	GLenum format;
+	if (nrComponents == 1)
+		format = GL_RED;
+	else if (nrComponents == 3)
+		format = GL_RGB;
+	else if (nrComponents == 4)
+		format = GL_RGBA;
+
+	glBindTexture(GL_TEXTURE_3D, textureID);
+	glTexImage3D(GL_TEXTURE_3D, 0, format, size.x, size.y, size.z, 0, format, GL_FLOAT, data);
+	glGenerateMipmap(GL_TEXTURE_3D);
+
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, clamp);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, clamp);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, clamp);
+
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // disables mipmap level
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	
+	return textureID;
 }
 
 #endif

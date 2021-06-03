@@ -72,4 +72,18 @@
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="VolVertexShader.glsl">
+      <Filter>资源文件</Filter>
+    </None>
+    <None Include="VolFragmentShader.glsl">
+      <Filter>资源文件</Filter>
+    </None>
+    <None Include="HistogramComputeShader.glsl">
+      <Filter>资源文件</Filter>
+    </None>
+    <None Include="HistogramComputeShaderNew.glsl">
+      <Filter>资源文件</Filter>
+    </None>
+  </ItemGroup>
 </Project>

@@ -149,6 +149,12 @@
     <ClInclude Include="imgui\imstb_truetype.h" />
     <ClInclude Include="main.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="HistogramComputeShader.glsl" />
+    <None Include="HistogramComputeShaderNew.glsl" />
+    <None Include="VolFragmentShader.glsl" />
+    <None Include="VolVertexShader.glsl" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
