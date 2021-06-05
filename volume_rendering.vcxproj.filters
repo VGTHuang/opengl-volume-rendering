@@ -91,13 +91,13 @@
     <None Include="VolFragmentShader.glsl">
       <Filter>资源文件</Filter>
     </None>
-    <None Include="HistogramComputeShaderNew.glsl">
-      <Filter>资源文件</Filter>
-    </None>
     <None Include="RenderComputeShader.glsl">
       <Filter>资源文件</Filter>
     </None>
     <None Include="ClearComputeShader.glsl">
+      <Filter>资源文件</Filter>
+    </None>
+    <None Include="HistogramComputeShader.glsl">
       <Filter>资源文件</Filter>
     </None>
   </ItemGroup>

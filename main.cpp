@@ -261,7 +261,7 @@ int main()
 
 	// shader
 	drawShader = new Shader("VolVertexShader.glsl", "VolFragmentShader.glsl");
-	histogramComputeShader = new Shader("HistogramComputeShaderNew.glsl");
+	histogramComputeShader = new Shader("HistogramComputeShader.glsl");
 	renderComputeShader = new Shader("RenderComputeShader.glsl");
 	clearComputeShader = new Shader("ClearComputeShader.glsl");
 	histogramComputeShader->use();
