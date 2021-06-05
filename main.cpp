@@ -35,70 +35,28 @@ void printTimer(const char *info) {
 	printf("%s %f\n", info, a);
 }
 
-std::string getImage3DConfig(int &x, int &y, int &z) {
+void getImage3DConfig(std::string &image3dPath, std::string &transferPath, int &x, int &y, int &z) {
 	std::string data;
 	std::ifstream rfile;
 
 	rfile.open("file_config.txt", std::ios::in | std::ios::out);
 
-	rfile >> data;
-
+	rfile >> image3dPath;
+	rfile >> transferPath;
 	rfile >> x >> y >> z;
 
 	rfile.close();
 
-	return data;
 }
 
-GLuint tex_input, tex_output;
-void genHistogramThisFunctionActuallyWorks(unsigned int img3DTex, glm::ivec3 img3DShape) {
-	// https://antongerdelan.net/opengl/compute.html#:~:text=Execution%201%20Creating%20the%20Texture%20%2F%20Image.%20We,...%205%20A%20Starter%20Ray%20Tracing%20Scene.%20
+GLuint image3DTexObj, histogramTexObj, renderTexObj, transferTexObj;
+bool firstRender = true;
+glm::vec4 bg(0.2, 0.2, 0.2, 1.0);
 
-	// input
-	int in_tex_w = 512, in_tex_h = 512;
-	float *f = new float[in_tex_w * in_tex_h * 4];
-	for (int i = 0; i < in_tex_w * in_tex_h; i++) {
-		f[i * 4 + 1] = 1.0;
-	}
-	glGenTextures(1, &tex_input);
+void genTexImage3D(unsigned short *imgVals, glm::ivec3 img3DShape) {
+	glGenTextures(1, &image3DTexObj);
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, tex_input);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, in_tex_w, in_tex_h, 0, GL_RGBA, GL_FLOAT,
-		f);
-	glBindImageTexture(0, tex_input, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-
-
-	// output
-	int out_tex_w = 512, out_tex_h = 512;
-
-	glGenTextures(1, &tex_output);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, tex_output);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, out_tex_w, out_tex_h, 0, GL_RGBA, GL_FLOAT,
-		NULL);
-	glBindImageTexture(1, tex_output, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-
-
-	histogramComputeShader->use();
-	glDispatchCompute(256, 128, 1);
-
-	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-}
-
-
-void genHistogram(unsigned short *imgVals, glm::ivec3 img3DShape) {
-	// input
-	glGenTextures(1, &tex_input);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_3D, tex_input);
+	glBindTexture(GL_TEXTURE_3D, image3DTexObj);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -106,23 +64,24 @@ void genHistogram(unsigned short *imgVals, glm::ivec3 img3DShape) {
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexImage3D(GL_TEXTURE_3D, 0, GL_R16, img3DShape.y, img3DShape.z, img3DShape.x, 0, GL_RED, GL_UNSIGNED_SHORT,
 		imgVals);
-	glBindImageTexture(0, tex_input, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R16);
+}
 
-
+void genHistogram(unsigned short *imgVals, glm::ivec3 img3DShape) {
+	glBindImageTexture(0, image3DTexObj, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R16);
 
 	// output
 	int out_tex_w = 512, out_tex_h = 512;
 
-	glGenTextures(1, &tex_output);
+	glGenTextures(1, &histogramTexObj);
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, tex_output);
+	glBindTexture(GL_TEXTURE_2D, histogramTexObj);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, out_tex_w, out_tex_h, 0, GL_RGBA, GL_FLOAT,
 		NULL);
-	glBindImageTexture(1, tex_output, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+	glBindImageTexture(1, histogramTexObj, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
 
 	histogramComputeShader->use();
@@ -131,20 +90,72 @@ void genHistogram(unsigned short *imgVals, glm::ivec3 img3DShape) {
 	// glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 	glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-
+	// read output texture to cpu
 	float *new_array = (float *)malloc(sizeof(float) * 4 * out_tex_w * out_tex_h);
-	glBindTexture(GL_TEXTURE_2D, tex_output);
+	unsigned char *new_array_unsigned_char = (unsigned char *)malloc(sizeof(unsigned char) * 4 * out_tex_w * out_tex_h);
 
+	glBindTexture(GL_TEXTURE_2D, histogramTexObj);
 	glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, new_array);
-
-	int asd = glGetError();
-	std::vector<float> vvv;
-	for (int i = 0; i < 100; i++) {
-		vvv.push_back(new_array[i]);
+	
+	for (int i = 0; i < out_tex_w * out_tex_h; i++) {
+		int ii = out_tex_w * (out_tex_h - (i / out_tex_h) - 1)  + i % out_tex_h;
+		new_array_unsigned_char[4 * i] = (unsigned char)(new_array[4 * ii] * 255);
+		new_array_unsigned_char[4 * i + 1] = (unsigned char)(new_array[4 * ii + 1] * 255);
+		new_array_unsigned_char[4 * i + 2] = (unsigned char)(new_array[4 * ii + 2] * 255);
+		new_array_unsigned_char[4 * i + 3] = 255;
 	}
-	// WE HAVE IT! save array to bmp?
 
-	int aasdfgasdfg = 1;
+	// save array to png
+
+	CString histogramSavePath("");
+	OpenWindowsDlg(false, true, true, 0, &histogramSavePath);
+	stbi_write_png(histogramSavePath + "\\histogram.png", out_tex_w, out_tex_h, 4, new_array_unsigned_char, 0);
+
+	free(new_array);
+	free(new_array_unsigned_char);
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void genTransfer(const std::string transferTexPath) {
+	glDeleteTextures(1, &transferTexObj);
+	transferTexObj = TextureLoader::loadTexture(transferTexPath.c_str());
+}
+
+void genRenderTex() {
+	// output
+	int out_tex_w = 512, out_tex_h = 512;
+	// TODO too many generated textures!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	glGenTextures(1, &renderTexObj);
+	glBindTexture(GL_TEXTURE_2D, renderTexObj);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, out_tex_w, out_tex_h, 0, GL_RGBA, GL_FLOAT,
+		NULL);
+}
+
+void renderToTex() {
+	glMemoryBarrier(GL_ALL_BARRIER_BITS);
+	glBindImageTexture(1, renderTexObj, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+	clearComputeShader->use();
+	glDispatchCompute(512, 512, 1);
+
+	
+	glMemoryBarrier(GL_ALL_BARRIER_BITS);
+	glBindImageTexture(1, image3DTexObj, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R16);
+	glBindImageTexture(2, renderTexObj, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, transferTexObj);
+
+	renderComputeShader->use();
+	glDispatchCompute(512, 512, 1);
+	
+
+	// glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+	glMemoryBarrier(GL_ALL_BARRIER_BITS);
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 
@@ -152,7 +163,8 @@ void genHistogram(unsigned short *imgVals, glm::ivec3 img3DShape) {
 int main()
 {
 	// config
-	std::string path(getImage3DConfig(imageX, imageY, imageZ));
+	std::string image3DPath, transferPath;
+	getImage3DConfig(image3DPath, transferPath, imageX, imageY, imageZ);
 
 	// glfw: initialize and configure
 	// ------------------------------
@@ -213,6 +225,7 @@ int main()
 
 	std::cout << glGetString(GL_VERSION) << std::endl;
 
+	stbi_set_flip_vertically_on_load(true);
 
 	// ******************************* read medical data *******************************
 
@@ -220,7 +233,7 @@ int main()
 	FILE *fpsrc = NULL;
 	unsigned short *imgValsUINT;
 	imgValsUINT = (unsigned short *)malloc(sizeof(unsigned short) * imageX * imageY * imageZ);
-	errno_t err = fopen_s(&fpsrc, path.c_str(), "r");
+	errno_t err = fopen_s(&fpsrc, image3DPath.c_str(), "r");
 	if (err != 0)
 	{
 		printf("can not open the raw image");
@@ -249,8 +262,20 @@ int main()
 	// shader
 	drawShader = new Shader("VolVertexShader.glsl", "VolFragmentShader.glsl");
 	histogramComputeShader = new Shader("HistogramComputeShaderNew.glsl");
-	genHistogram(imgValsUINT, imgShape);
+	renderComputeShader = new Shader("RenderComputeShader.glsl");
+	clearComputeShader = new Shader("ClearComputeShader.glsl");
+	histogramComputeShader->use();
+	histogramComputeShader->setInt("maxImgValue", maxImgValue);
+	renderComputeShader->use();
+	renderComputeShader->setInt("maxImgValue", maxImgValue);
+	clearComputeShader->use();
+	clearComputeShader->setVec4("bg", bg);
 
+	
+	// generate stuff
+	genTexImage3D(imgValsUINT, imgShape);
+	genTransfer(transferPath);
+	genRenderTex();
 	free(imgValsUINT);
 	// ******************************* test *******************************
 
@@ -292,6 +317,7 @@ int main()
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
 	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
 
 
 	// ******************************* end test *******************************
@@ -326,8 +352,15 @@ int main()
 			ImGui::Text("Use AWSD to control pitch/yaw; drag to pan camera");
 			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 			if (ImGui::Button("download histogram")) {
-				printf("btn clicked\n");
+				genHistogram(imgValsUINT, imgShape);
 			}
+			if (ImGui::Button("change transfer tex")) {
+				CString transferLoadPath("");
+				OpenWindowsDlg(false, true, false, 3, &transferLoadPath);
+				std::cout << transferLoadPath << std::endl;
+				genTransfer(std::string(transferLoadPath));
+			}
+			ImGui::ColorEdit4("background", (float*)&bg);
 			ImGui::End();
 		}
 
@@ -340,9 +373,15 @@ int main()
 
 		processInput(window);
 
+		
+
 		glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		clearComputeShader->use();
+		clearComputeShader->setVec4("bg", bg);
+
+		renderToTex();
 		glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
 		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(camera->GetViewMat4()));
 		glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(camera->GetProjectionMat4()));
@@ -351,8 +390,8 @@ int main()
 		// bind textures on corresponding texture units
 		// glActiveTexture(GL_TEXTURE0);
 		// glBindTexture(GL_TEXTURE_3D, img3DTex);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, tex_output);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, renderTexObj);
 
 		drawShader->use();
 		drawShader->setVec3("camPos", camera->GetCameraPos());

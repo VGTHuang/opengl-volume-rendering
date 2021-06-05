@@ -129,6 +129,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\opengl\glad\src\glad.c" />
+    <ClCompile Include="..\..\..\opengl\headers\stb_image.cpp" />
+    <ClCompile Include="..\..\..\opengl\headers\stb_image_write.cpp" />
     <ClCompile Include="imgui\imgui.cpp" />
     <ClCompile Include="imgui\imgui_demo.cpp" />
     <ClCompile Include="imgui\imgui_draw.cpp" />
@@ -139,6 +141,8 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\opengl\headers\stb_image.h" />
+    <ClInclude Include="..\..\..\opengl\headers\stb_image_write.h" />
     <ClInclude Include="imgui\imconfig.h" />
     <ClInclude Include="imgui\imgui.h" />
     <ClInclude Include="imgui\imgui_impl_glfw.h" />
@@ -150,8 +154,9 @@
     <ClInclude Include="main.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="HistogramComputeShader.glsl" />
+    <None Include="ClearComputeShader.glsl" />
     <None Include="HistogramComputeShaderNew.glsl" />
+    <None Include="RenderComputeShader.glsl" />
     <None Include="VolFragmentShader.glsl" />
     <None Include="VolVertexShader.glsl" />
   </ItemGroup>

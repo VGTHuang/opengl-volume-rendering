@@ -42,6 +42,12 @@
     <ClCompile Include="imgui\imgui_widgets.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\opengl\headers\stb_image.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\opengl\headers\stb_image_write.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h">
@@ -71,6 +77,12 @@
     <ClInclude Include="imgui\imstb_truetype.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\opengl\headers\stb_image.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\opengl\headers\stb_image_write.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="VolVertexShader.glsl">
@@ -79,10 +91,13 @@
     <None Include="VolFragmentShader.glsl">
       <Filter>资源文件</Filter>
     </None>
-    <None Include="HistogramComputeShader.glsl">
+    <None Include="HistogramComputeShaderNew.glsl">
       <Filter>资源文件</Filter>
     </None>
-    <None Include="HistogramComputeShaderNew.glsl">
+    <None Include="RenderComputeShader.glsl">
+      <Filter>资源文件</Filter>
+    </None>
+    <None Include="ClearComputeShader.glsl">
       <Filter>资源文件</Filter>
     </None>
   </ItemGroup>

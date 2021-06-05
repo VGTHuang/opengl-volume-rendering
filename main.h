@@ -4,10 +4,14 @@
 
 #define NOMINMAX
 #include <Windows.h>
+#include <Shlobj.h>
+#include <atlstr.h>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "shader_s.h"
+#include <stb_image.h>
+#include <stb_image_write.h>
 #include <hhx_camera_1.0.h>
 #include <texture_loader.h>
 
@@ -23,14 +27,14 @@
 #include <fstream>
 #include <vector>
 #include <string>
-#include<algorithm>
+#include <algorithm>
 #include <chrono>
 
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
-Shader *drawShader, *histogramComputeShader;
+Shader *drawShader, *histogramComputeShader, *renderComputeShader, *clearComputeShader;
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
@@ -154,4 +158,207 @@ unsigned int loadTexture3D(float const *data, const int nrComponents, const glm:
 	return textureID;
 }
 
+std::string openfilename(const char *filter = "All Files (*.*)\0*.*\0", HWND owner = NULL) {
+	
+	OPENFILENAME ofn;
+	char fileName[MAX_PATH] = "";
+	ZeroMemory(&ofn, sizeof(ofn));
+
+	ofn.lStructSize = sizeof(OPENFILENAME);
+	ofn.hwndOwner = owner;
+	ofn.lpstrFilter = filter;
+	ofn.lpstrFile = fileName;
+	ofn.nMaxFile = MAX_PATH;
+	ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
+	ofn.lpstrDefExt = "";
+
+	std::string fileNameStr;
+	
+	if (GetOpenFileName(&ofn))
+		fileNameStr = fileName;
+
+	return fileNameStr;
+}
+
+// https://blog.csdn.net/Murphy_CoolCoder/article/details/89380888
+//Windows API Open dialogbox.
+//nType is a sign which deceide the dialog box filter format.
+bool OpenWindowsDlg(bool isMultiSelect, bool IsOpen, bool IsPickFolder, int nType, CString *pFilePath)
+{
+	CoInitialize(nullptr);
+	if (!isMultiSelect)
+	{
+		IFileDialog *pfd = NULL;
+		HRESULT hr = NULL;
+		if (IsOpen)
+			hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
+		else
+			hr = CoCreateInstance(CLSID_FileSaveDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
+		if (SUCCEEDED(hr))
+		{
+			DWORD dwFlags;
+			hr = pfd->GetOptions(&dwFlags);
+			if (IsPickFolder)
+				hr = pfd->SetOptions(dwFlags | FOS_PICKFOLDERS);
+			else
+				hr = pfd->SetOptions(dwFlags | FOS_FORCEFILESYSTEM);
+			switch (nType)
+			{
+			case 0:
+			{
+				COMDLG_FILTERSPEC fileType[] =
+				{
+					{ L"All files", L"*.*" },
+					{ L"Text files",   L"*.txt*" },
+					{ L"Pictures", L"*.png" },
+				};
+				hr = pfd->SetFileTypes(ARRAYSIZE(fileType), fileType);
+				break;
+			}
+			case 1: //open or save recipe only allow file with extension .7z
+			{
+				COMDLG_FILTERSPEC fileType[] =
+				{
+					{ L"Reciep",L"*.7z*" },
+				};
+				hr = pfd->SetFileTypes(ARRAYSIZE(fileType), fileType);
+				break;
+			}
+			case 2://Load or export file with different file extension
+			{
+				COMDLG_FILTERSPEC fileType[] =
+				{
+					{ L"Text",L"*.txt" },
+					{ L"CSV",L".csv" },
+					{ L"ini",L".ini" },
+				};
+				hr = pfd->SetFileTypes(ARRAYSIZE(fileType), fileType);
+				break;
+			}
+			case 3: //Save as a print screen capture as  .png  format.
+			{
+				COMDLG_FILTERSPEC fileType[] =
+				{
+					{ L"Picture",L"*.png" },
+				};
+				hr = pfd->SetFileTypes(ARRAYSIZE(fileType), fileType);
+				break;
+			}
+			case 4:
+			{
+				COMDLG_FILTERSPEC fileType[] =
+				{
+					{ L"Xml Document",L"*.xml*" },
+				};
+				hr = pfd->SetFileTypes(ARRAYSIZE(fileType), fileType);
+				break;
+			}
+			default:
+				break;
+			}
+
+			if (!IsOpen) //Save mode get file extension
+			{
+				if (nType == 1)
+					hr = pfd->SetDefaultExtension(L"7z");
+				if (nType == 3)
+					hr = pfd->SetDefaultExtension(L"png");
+				if (nType == 4)
+					hr = pfd->SetDefaultExtension(L"xml");
+			}
+			hr = pfd->Show(NULL); //Show dialog
+			if (SUCCEEDED(hr))
+			{
+				if (!IsOpen)       //Capture user change when select differen file extension.
+				{
+					if (nType == 2)
+					{
+						UINT  unFileIndex(1);
+						hr = pfd->GetFileTypeIndex(&unFileIndex);
+						switch (unFileIndex)
+						{
+						case 0:
+							hr = pfd->SetDefaultExtension(L"txt");
+							break;
+						case 1:
+							hr = pfd->SetDefaultExtension(L"csv");
+							break;
+						case 2:
+							hr = pfd->SetDefaultExtension(L"ini");
+							break;
+						default:
+							hr = pfd->SetDefaultExtension(L"txt");
+							break;
+						}
+					}
+				}
+			}
+			if (SUCCEEDED(hr))
+			{
+				IShellItem *pSelItem;
+				hr = pfd->GetResult(&pSelItem);
+				if (SUCCEEDED(hr))
+				{
+					LPWSTR pszFilePath = NULL;
+					hr = pSelItem->GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING, &pszFilePath);
+					*pFilePath = pszFilePath;
+					CoTaskMemFree(pszFilePath);
+				}
+				pSelItem->Release();
+			}
+		}
+		pfd->Release();
+	}
+	else  //Open dialog with multi select allowed;
+	{
+		IFileOpenDialog *pfd = NULL;
+		HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
+		if (SUCCEEDED(hr))
+		{
+			DWORD dwFlags;
+			hr = pfd->GetOptions(&dwFlags);
+			hr = pfd->SetOptions(dwFlags | FOS_FORCEFILESYSTEM | FOS_ALLOWMULTISELECT);
+			COMDLG_FILTERSPEC fileType[] =
+			{
+				{ L"All files", L"*.*" },
+				{ L"Text files",   L"*.txt*" },
+				{ L"Pictures", L"*.png" },
+			};
+			hr = pfd->SetFileTypes(ARRAYSIZE(fileType), fileType);
+			hr = pfd->SetFileTypeIndex(1);
+			hr = pfd->Show(NULL);
+			if (SUCCEEDED(hr))
+			{
+				IShellItemArray  *pSelResultArray;
+				hr = pfd->GetResults(&pSelResultArray);
+				if (SUCCEEDED(hr))
+				{
+					DWORD dwNumItems = 0; // number of items in multiple selection
+					hr = pSelResultArray->GetCount(&dwNumItems);  // get number of selected items
+					for (DWORD i = 0; i < dwNumItems; i++)
+					{
+						IShellItem *pSelOneItem = NULL;
+						PWSTR pszFilePath = NULL; // hold file paths of selected items
+						hr = pSelResultArray->GetItemAt(i, &pSelOneItem); // get a selected item from the IShellItemArray
+						if (SUCCEEDED(hr))
+						{
+							hr = pSelOneItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
+							if (SUCCEEDED(hr))
+							{
+								/*szSelected += pszFilePath;
+								if (i < (dwNumItems - 1))
+									szSelected += L"\n";*/
+								CoTaskMemFree(pszFilePath);
+							}
+							pSelOneItem->Release();
+						}
+					}
+					pSelResultArray->Release();
+				}
+			}
+		}
+		pfd->Release();
+	}
+	return true;
+}
 #endif

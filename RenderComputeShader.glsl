@@ -4,8 +4,10 @@
 #version 430
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
-layout(r16, binding = 0) uniform readonly image3D img_input;
-layout(rgba32f, binding = 1) uniform image2D img_output;
+layout(r16, binding = 1) uniform readonly image3D img_input;
+layout(rgba32f, binding = 2) uniform image2D img_output;
+
+uniform sampler2D transfer;
 
 uniform int maxImgValue;
 
@@ -23,19 +25,6 @@ float getImageGrad(ivec3 coords) {
 	return sqrt(pow((v1-v2)/2.0, 2) + pow((v3-v4)/2.0, 2) + pow((v5-v6)/2.0, 2));
 }
 
-float getImageLap(ivec3 coords) {
-	float v = getImageData(coords);
-	float v1 = getImageData(coords + ivec3(-1, 0, 0));
-	float v2 = getImageData(coords + ivec3(1, 0, 0));
-	float v3 = getImageData(coords + ivec3(0, -1, 0));
-	float v4 = getImageData(coords + ivec3(0, 1, 0));
-	float v5 = getImageData(coords + ivec3(0, 0, -1));
-	float v6 = getImageData(coords + ivec3(0, 0, 1));
-	float divX = v1 + v2 - 2.0 * v;
-	float divY = v3 + v4 - 2.0 * v;
-	float divZ = v5 + v6 - 2.0 * v;
-	return 0.5 + divX + divY + divZ;
-}
 
 void main() {
 
@@ -45,12 +34,16 @@ void main() {
   float grad = getImageGrad(pixel_coords);
 
   ivec2 out_size = imageSize(img_output);
-  ivec2 out_coords = ivec2(floor(out_size.x * value), floor(out_size.y * grad));
-  
-  float original_value = imageLoad(img_output, out_coords).x;
-  float increment = pow(100, -1 / (1 - 1.1 * original_value));
+  vec2 out_coords = vec2(value, grad);
 
-  imageStore(img_output, out_coords, vec4(vec3(original_value + increment), 1.0));
-  // imageStore(img_output, out_coords, vec4(1.0, 1.0, 0.0, 1.0));
+  vec4 out_color = texture(transfer, out_coords);
+  //vec4 out_color = vec4(1.0, 0.0, 0.0, 1.0);
+
+  vec4 original_value = imageLoad(img_output, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y));
+
+  vec4 blend_color = out_color * out_color.w + original_value * (1.0 - out_color.w);
+  blend_color.w = 1;
+
+  imageStore(img_output, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), blend_color);
 
 }

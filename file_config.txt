@@ -1,4 +1,5 @@
 H:/hhx/hhx_works/scientific_visualization_2021/visualization-data/raw_data/cbct_sample_z=507_y=512_x=512.raw
+H:/hhx/hhx_works/scientific_visualization_2021/transfer/transfer.png
 507 512 512
 
 H:/hhx/hhx_works/scientific_visualization_2021/visualization-data/raw_data/sunxia_256.raw
