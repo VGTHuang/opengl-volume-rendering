@@ -31,8 +31,8 @@
 #include <chrono>
 
 // settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+const unsigned int SCR_WIDTH = 640;
+const unsigned int SCR_HEIGHT = 640;
 
 Shader *drawShader, *histogramComputeShader, *renderComputeShader, *clearComputeShader;
 

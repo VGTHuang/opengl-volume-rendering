@@ -118,7 +118,7 @@ void genHistogram(unsigned short *imgVals, glm::ivec3 img3DShape) {
 
 void genTransfer(const std::string transferTexPath) {
 	glDeleteTextures(1, &transferTexObj);
-	transferTexObj = TextureLoader::loadTexture(transferTexPath.c_str());
+	transferTexObj = TextureLoader::loadTexture(transferTexPath.c_str(), GL_REPEAT);
 }
 
 void genRenderTex() {
@@ -150,6 +150,8 @@ void renderToTex() {
 	glBindTexture(GL_TEXTURE_2D, transferTexObj);
 
 	renderComputeShader->use();
+	renderComputeShader->setMat4("view", camera->GetViewMat4());
+	renderComputeShader->setMat4("projection", camera->GetProjectionMat4());
 	glDispatchCompute(512, 512, 1);
 	
 
@@ -279,7 +281,7 @@ int main()
 	free(imgValsUINT);
 	// ******************************* test *******************************
 
-	float *cube = TextureLoader().getCube();
+	float *plane = TextureLoader().getCube();
 
 	unsigned int VAO, VBO;
 
@@ -288,7 +290,7 @@ int main()
 	glGenBuffers(1, &VBO);
 	glBindVertexArray(VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, 36 * 8 * sizeof(float), cube, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, 6 * 8 * sizeof(float), plane, GL_STATIC_DRAW);
 	
 
 	// position attribute
@@ -301,20 +303,14 @@ int main()
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
 	glEnableVertexAttribArray(2);
 
+	unsigned int uboMatricesIndex = glGetUniformBlockIndex(renderComputeShader->ID, "Matrices");
 
-	unsigned int uboMatrices;
-	glGenBuffers(1, &uboMatrices);
+	glUniformBlockBinding(renderComputeShader->ID, uboMatricesIndex, 0);
 
-	glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
-	glBufferData(GL_UNIFORM_BUFFER, 3 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
-	glBindBuffer(GL_UNIFORM_BUFFER, 0);
-	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 3 * sizeof(glm::mat4));
 
 	glm::mat4 modelMat = glm::mat4(1.0f);
-
-	glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
-	glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(modelMat));
-	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+	renderComputeShader->use();
+	renderComputeShader->setMat4("model", modelMat);
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
@@ -378,14 +374,7 @@ int main()
 		glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		clearComputeShader->use();
-		clearComputeShader->setVec4("bg", bg);
-
 		renderToTex();
-		glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
-		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(camera->GetViewMat4()));
-		glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(camera->GetProjectionMat4()));
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
 		// bind textures on corresponding texture units
 		// glActiveTexture(GL_TEXTURE0);
@@ -394,10 +383,12 @@ int main()
 		glBindTexture(GL_TEXTURE_2D, renderTexObj);
 
 		drawShader->use();
-		drawShader->setVec3("camPos", camera->GetCameraPos());
+		// TODO delete these 2 lines later!
+		drawShader->setMat4("view", camera->GetViewMat4());
+		drawShader->setMat4("projection", camera->GetProjectionMat4());
 		// render boxes
 		glBindVertexArray(VAO);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		// render imgui
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
