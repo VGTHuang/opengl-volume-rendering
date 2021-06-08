@@ -36,22 +36,23 @@ float getImageGrad(ivec3 coords) {
 void main() {
 
   // calc projected coords
-  vec4 fake_gl_Position = projection * view * model * vec4(float(gl_GlobalInvocationID.x) / 512.0, 0.0, float(gl_GlobalInvocationID.y) / 512.0, 1.0);
-  vec2 fake_gl_FragCoord = (1 + fake_gl_Position.xy / fake_gl_Position.w)/2;
+  vec4 fake_gl_Position = projection * view * model * vec4(float(gl_GlobalInvocationID.x) / 512.0, float(gl_GlobalInvocationID.y) / 512.0, float(gl_GlobalInvocationID.z) / 512.0, 1.0);
+  vec2 fake_gl_FragCoord = (1 + fake_gl_Position.xy / fake_gl_Position.w) * 512.0 / 2;
 
   
   // calc value & grad at sampled position of image3d
-  ivec3 pixel_coords = ivec3(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, 0);
+  ivec3 pixel_coords = ivec3(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, gl_GlobalInvocationID.z);
   float value =  getImageData(pixel_coords);
   float grad = getImageGrad(pixel_coords);
 
   // calc color
   vec2 transfer_coords = vec2(value, grad);
   vec4 out_color = texture(transfer, transfer_coords);
-  vec4 original_value = imageLoad(img_output, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y));
+  out_color.w = out_color.w * 0.05;
+  vec4 original_value = imageLoad(img_output, ivec2(fake_gl_FragCoord));
   vec4 blend_color = out_color * out_color.w + original_value * (1.0 - out_color.w);
   blend_color.w = 1;
 
   if(fake_gl_Position.w > 0)
-	imageStore(img_output, ivec2(int(fake_gl_FragCoord.x * 512), int(fake_gl_FragCoord.y * 512)), blend_color);
+	imageStore(img_output, ivec2(fake_gl_FragCoord), blend_color);
 }

@@ -152,7 +152,7 @@ void renderToTex() {
 	renderComputeShader->use();
 	renderComputeShader->setMat4("view", camera->GetViewMat4());
 	renderComputeShader->setMat4("projection", camera->GetProjectionMat4());
-	glDispatchCompute(512, 512, 1);
+	glDispatchCompute(512, 512, 100);
 	
 
 	// glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -281,27 +281,8 @@ int main()
 	free(imgValsUINT);
 	// ******************************* test *******************************
 
-	float *plane = TextureLoader().getCube();
+	int planeVAO = TextureLoader().getPlane(2.0);
 
-	unsigned int VAO, VBO;
-
-	// total size of the buffer in bytes
-	glGenVertexArrays(1, &VAO);
-	glGenBuffers(1, &VBO);
-	glBindVertexArray(VAO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, 6 * 8 * sizeof(float), plane, GL_STATIC_DRAW);
-	
-
-	// position attribute
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-	// normal attribute
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-	glEnableVertexAttribArray(1);
-	// tex attribute
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-	glEnableVertexAttribArray(2);
 
 	unsigned int uboMatricesIndex = glGetUniformBlockIndex(renderComputeShader->ID, "Matrices");
 
@@ -383,12 +364,9 @@ int main()
 		glBindTexture(GL_TEXTURE_2D, renderTexObj);
 
 		drawShader->use();
-		// TODO delete these 2 lines later!
-		drawShader->setMat4("view", camera->GetViewMat4());
-		drawShader->setMat4("projection", camera->GetProjectionMat4());
 		// render boxes
-		glBindVertexArray(VAO);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glBindVertexArray(planeVAO);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
 		// render imgui
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
