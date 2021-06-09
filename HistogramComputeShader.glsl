@@ -4,13 +4,13 @@
 #version 430
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
-layout(r16, binding = 0) uniform readonly image3D img_input;
-layout(rgba32f, binding = 1) uniform image2D img_output;
+layout(r16, binding = 0) uniform readonly image3D imgInput;
+layout(rgba32f, binding = 1) uniform image2D imgOutput;
 
 uniform int maxImgValue;
 
 float getImageData(ivec3 coords) {
-	return imageLoad(img_input, coords).r * 65536.0 / float(maxImgValue);
+	return imageLoad(imgInput, coords).r * 65536.0 / float(maxImgValue);
 }
 
 float getImageGrad(ivec3 coords) {
@@ -44,13 +44,11 @@ void main() {
   float value =  getImageData(pixel_coords);
   float grad = getImageGrad(pixel_coords);
 
-  ivec2 out_size = imageSize(img_output);
-  ivec2 out_coords = ivec2(floor(out_size.x * value), floor(out_size.y * grad));
+  ivec2 outSize = imageSize(imgOutput);
+  ivec2 outCoords = ivec2(floor(outSize.x * value), floor(outSize.y * grad));
   
-  float original_value = imageLoad(img_output, out_coords).x;
-  float increment = pow(100, -1 / (1 - 1.1 * original_value));
+  float originalValue = imageLoad(imgOutput, outCoords).x;
+  float increment = pow(100, -1 / (1 - 1.1 * originalValue));
 
-  imageStore(img_output, out_coords, vec4(vec3(original_value + increment), 1.0));
-  // imageStore(img_output, out_coords, vec4(1.0, 1.0, 0.0, 1.0));
-
+  imageStore(imgOutput, outCoords, vec4(vec3(originalValue + increment), 1.0));
 }

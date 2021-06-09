@@ -35,6 +35,13 @@ void printTimer(const char *info) {
 	printf("%s %f\n", info, a);
 }
 
+GLuint image3DTexObj, histogramTexObj, renderTexObj, transferTexObj, transferTexObj2, framebuffer, textureColorbuffer;
+int cubeVAO, planeVAO;
+bool firstRender = true;
+glm::vec4 bg(0.2, 0.2, 0.2, 1.0);
+float opacity = 0.0001;
+int sampleCount = 30;
+
 void getImage3DConfig(std::string &image3dPath, std::string &transferPath, int &x, int &y, int &z) {
 	std::string data;
 	std::ifstream rfile;
@@ -49,9 +56,6 @@ void getImage3DConfig(std::string &image3dPath, std::string &transferPath, int &
 
 }
 
-GLuint image3DTexObj, histogramTexObj, renderTexObj, transferTexObj;
-bool firstRender = true;
-glm::vec4 bg(0.2, 0.2, 0.2, 1.0);
 
 void genTexImage3D(unsigned short *imgVals, glm::ivec3 img3DShape) {
 	glGenTextures(1, &image3DTexObj);
@@ -119,12 +123,13 @@ void genHistogram(unsigned short *imgVals, glm::ivec3 img3DShape) {
 void genTransfer(const std::string transferTexPath) {
 	glDeleteTextures(1, &transferTexObj);
 	transferTexObj = TextureLoader::loadTexture(transferTexPath.c_str(), GL_REPEAT);
+	glDeleteTextures(1, &transferTexObj2);
+	transferTexObj2 = TextureLoader::loadTexture("H:/hhx/hhx_works/scientific_visualization_2021/transfer/transfer_test.png", GL_REPEAT);
 }
 
 void genRenderTex() {
 	// output
 	int out_tex_w = 512, out_tex_h = 512;
-	// TODO too many generated textures!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	glGenTextures(1, &renderTexObj);
 	glBindTexture(GL_TEXTURE_2D, renderTexObj);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -133,26 +138,86 @@ void genRenderTex() {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, out_tex_w, out_tex_h, 0, GL_RGBA, GL_FLOAT,
 		NULL);
+
+	// Get the uniform variables location. You've probably already done that before...
+	int transferTexLocation = glGetUniformLocation(renderComputeShader->ID, "transfer");
+	int depthTexLocation = glGetUniformLocation(renderComputeShader->ID, "depth");
+
+	// Then bind the uniform samplers to texture units:
+	renderComputeShader->use();
+	glUniform1i(transferTexLocation, 0);
+	glUniform1i(depthTexLocation, 1);
+}
+
+void genDepthStencilFBO() {
+	// framebuffer configuration
+    // -------------------------
+	glGenFramebuffers(1, &framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	// create a color attachment texture
+	glGenTextures(1, &textureColorbuffer);
+	glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorbuffer, 0);
+	// create a renderbuffer object for depth and stencil attachment (we won't be sampling these)
+	unsigned int rbo;
+	glGenRenderbuffers(1, &rbo);
+	glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT); // use a single renderbuffer object for both a depth AND stencil buffer.
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo); // now actually attach it
+	// now that we actually created the framebuffer and added all attachments we want to check if it is actually complete now
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+}
+
+void renderToDepth() {
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	glEnable(GL_DEPTH_TEST); // enable depth testing (is disabled for rendering screen-space quad)
+
+	glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	// make sure we clear the framebuffer's content
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	depthStencilShader->use();
+
+	glBindVertexArray(cubeVAO);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+
+	glBindVertexArray(0);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void renderToTex() {
 	glMemoryBarrier(GL_ALL_BARRIER_BITS);
 	glBindImageTexture(1, renderTexObj, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 	clearComputeShader->use();
+	clearComputeShader->setVec4("bg", bg);
 	glDispatchCompute(512, 512, 1);
 
 	
 	glMemoryBarrier(GL_ALL_BARRIER_BITS);
 	glBindImageTexture(1, image3DTexObj, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R16);
 	glBindImageTexture(2, renderTexObj, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+	// glBindImageTexture(3, textureColorbuffer, 0, FALSE, 0, GL_READ_ONLY, GL_R32F);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, transferTexObj);
-
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
+	int a = glGetError();
 	renderComputeShader->use();
-	renderComputeShader->setMat4("view", camera->GetViewMat4());
-	renderComputeShader->setMat4("projection", camera->GetProjectionMat4());
-	glDispatchCompute(512, 512, 100);
+	renderComputeShader->setVec4("bg", bg);
+	renderComputeShader->setFloat("opacity", opacity);
+	renderComputeShader->setInt("sampleCount", sampleCount);
+	glDispatchCompute(128, 128, 1);
 	
 
 	// glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -206,8 +271,8 @@ int main()
 	glfwMakeContextCurrent(window);
 
 	// camera
-	glm::vec3 camPos(-3.0f, -1.5f, -1.5f);
-	camera = new Camera(camPos, SCR_WIDTH, SCR_HEIGHT, 2.0f, 0.5f);
+	glm::vec3 camPos(3.0f, 2.0f, 2.0f);
+	camera = new Camera(camPos, SCR_WIDTH, SCR_HEIGHT, 1.0f, 0.5f);
 
 	// glfw events
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -266,10 +331,13 @@ int main()
 	histogramComputeShader = new Shader("HistogramComputeShader.glsl");
 	renderComputeShader = new Shader("RenderComputeShader.glsl");
 	clearComputeShader = new Shader("ClearComputeShader.glsl");
+	depthStencilShader = new Shader("DepthStencilVertexShader.glsl", "DepthStencilFragmentShader.glsl");
+
 	histogramComputeShader->use();
 	histogramComputeShader->setInt("maxImgValue", maxImgValue);
 	renderComputeShader->use();
 	renderComputeShader->setInt("maxImgValue", maxImgValue);
+	renderComputeShader->setVec4("bg", bg);
 	clearComputeShader->use();
 	clearComputeShader->setVec4("bg", bg);
 
@@ -278,20 +346,41 @@ int main()
 	genTexImage3D(imgValsUINT, imgShape);
 	genTransfer(transferPath);
 	genRenderTex();
+	genDepthStencilFBO();
 	free(imgValsUINT);
-	// ******************************* test *******************************
 
-	int planeVAO = TextureLoader().getPlane(2.0);
+	// plane for rendering to screen plane
+	// cube for rendering the volume's depth & stencil
+	planeVAO = TextureLoader().getPlaneVAO(2.0);
+	cubeVAO = TextureLoader().getCubeVAO();
+
+	// uniform buffer for renderComputeShader & depthStencilShader; stores projection & view matrices
+	unsigned int uboMatrices;
+	glGenBuffers(1, &uboMatrices);
+
+	glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+	glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4) + sizeof(glm::vec3), NULL, GL_STATIC_DRAW);
+	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 2 * sizeof(glm::mat4));
 
 
-	unsigned int uboMatricesIndex = glGetUniformBlockIndex(renderComputeShader->ID, "Matrices");
+	unsigned int renderMatrices = glGetUniformBlockIndex(renderComputeShader->ID, "Matrices");
+	glUniformBlockBinding(renderComputeShader->ID, renderMatrices, 0);
+	unsigned int depthMatrices = glGetUniformBlockIndex(depthStencilShader->ID, "Matrices");
+	glUniformBlockBinding(depthStencilShader->ID, depthMatrices, 0);
 
-	glUniformBlockBinding(renderComputeShader->ID, uboMatricesIndex, 0);
-
-
-	glm::mat4 modelMat = glm::mat4(1.0f);
+	// set model mat for renderComputeShader
+	glm::mat4 modelMatRender = glm::mat4(1.0f);
 	renderComputeShader->use();
-	renderComputeShader->setMat4("model", modelMat);
+	renderComputeShader->setMat4("model", modelMatRender);
+	// set model mat for depthStencilShader
+	glm::mat4 modelMatDepth = glm::mat4(1.0f);
+	modelMatDepth = glm::translate(modelMatDepth, glm::vec3(imageY / (2 * 512.0), imageZ / (2 * 512.0), imageX / (2 * 512.0)));
+	modelMatDepth = glm::scale(modelMatDepth, glm::vec3(imageY / 512.0, imageZ / 512.0, imageX / 512.0));
+	// modelMatDepth = glm::scale(modelMatDepth, glm::vec3((imageY / 512.0, imageZ / 512.0, imageX / 512.0)));
+	depthStencilShader->use();
+	depthStencilShader->setMat4("model", modelMatDepth);
+
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
@@ -337,6 +426,8 @@ int main()
 				std::cout << transferLoadPath << std::endl;
 				genTransfer(std::string(transferLoadPath));
 			}
+			ImGui::SliderFloat("opacity", &opacity, 0.0001f, 0.01f, "%.4f");
+			ImGui::SliderInt("samples", &sampleCount, 10, 100);
 			ImGui::ColorEdit4("background", (float*)&bg);
 			ImGui::End();
 		}
@@ -355,6 +446,13 @@ int main()
 		glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(camera->GetViewMat4()));
+		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(camera->GetProjectionMat4()));
+		glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), sizeof(glm::vec3), glm::value_ptr(camera->GetCameraPos()));
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+		
+		renderToDepth();
 		renderToTex();
 
 		// bind textures on corresponding texture units

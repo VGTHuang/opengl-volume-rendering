@@ -34,7 +34,7 @@
 const unsigned int SCR_WIDTH = 640;
 const unsigned int SCR_HEIGHT = 640;
 
-Shader *drawShader, *histogramComputeShader, *renderComputeShader, *clearComputeShader;
+Shader *drawShader, *histogramComputeShader, *renderComputeShader, *clearComputeShader, *depthStencilShader;
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;

@@ -155,6 +155,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="ClearComputeShader.glsl" />
+    <None Include="DepthStencilFragmentShader.glsl" />
+    <None Include="DepthStencilVertexShader.glsl" />
     <None Include="HistogramComputeShader.glsl" />
     <None Include="RenderComputeShader.glsl" />
     <None Include="VolFragmentShader.glsl" />

@@ -100,5 +100,11 @@
     <None Include="HistogramComputeShader.glsl">
       <Filter>资源文件</Filter>
     </None>
+    <None Include="DepthStencilVertexShader.glsl">
+      <Filter>资源文件</Filter>
+    </None>
+    <None Include="DepthStencilFragmentShader.glsl">
+      <Filter>资源文件</Filter>
+    </None>
   </ItemGroup>
 </Project>
