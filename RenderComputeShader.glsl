@@ -7,6 +7,7 @@ layout(rgba32f, binding = 2) uniform image2D imgOutput;
 uniform sampler2D transfer;
 uniform sampler2D depth;
 
+uniform float canvasSize;
 uniform int maxImgValue;
 uniform mat4 model;
 uniform vec4 bg;
@@ -83,7 +84,7 @@ void main() {
 	*/
 	
 
-	vec4 depthIndicator = texture(depth, vec2(float(gl_GlobalInvocationID.x) / 512.0, float(gl_GlobalInvocationID.y) / 512.0));
+	vec4 depthIndicator = texture(depth, vec2(float(gl_GlobalInvocationID.x) / canvasSize, float(gl_GlobalInvocationID.y) / canvasSize));
 	/*
 	// draw a red bbox of the rendered volume for testing
 	vec4 originalPxValue1 = imageLoad(imgOutput, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y));
@@ -93,29 +94,29 @@ void main() {
 
 
 
-	vec4 rayEnd = vec4(getRay(vec2(float(gl_GlobalInvocationID.x) / 512.0, float(gl_GlobalInvocationID.y) / 512.0) * 2 - 1), 0.0);
+	vec4 rayEnd = vec4(getRay(vec2(float(gl_GlobalInvocationID.x) / canvasSize, float(gl_GlobalInvocationID.y) / canvasSize) * 2 - 1), 0.0);
 	vec4 rayStart = vec4(camPos, 0.0);
 	vec3 ray = normalize(vec3(rayEnd - rayStart));
-	float nearestVoxDist = LinearizeDepth(depthIndicator.x);
+	float nearestVoxDist = LinearizeDepth(depthIndicator.x) - 0.2;
 	if(depthIndicator.y > 0.1) {
 		// camera is inside the volume
 		nearestVoxDist = 0;
 	}
-	vec3 tempCastPos = camPos + ray * (nearestVoxDist - 0.02);
+	vec3 tempCastPos = camPos + ray * nearestVoxDist;
 
 	// front to back compositing
 	vec3 accC = vec3(0);
 	float accA = 0;
 	for(int i = 0; i < sampleCount; i++) {
-		vec4 currentCol = getTransferedVal(ivec3(tempCastPos * 512.0));
+		vec4 currentCol = getTransferedVal(ivec3(tempCastPos * canvasSize));
 		// C'(i) = (1 - A'(i-1))C(i) + C'(i-1)
 		accC = (1 - accA) * vec3(currentCol) + accC;
 		// A'(i) = (1-A'(i-1)).A(i) + A'(i-1)
-		accA = (1 - accA) * currentCol.w * opacity + accA;
+		accA = (1 - accA) * currentCol.w * opacity / sampleCount + accA;
 		if(accA >= 0.5) {
 			break;
 		}
-		tempCastPos += ray / (0.7 * sampleCount);
+		tempCastPos += ray / (0.6 * sampleCount);
 	}
 	if(depthIndicator.z > 0.1)
 		imageStore(imgOutput, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), vec4(vec3(bg) * (1 - accA) + accC * accA, 1));

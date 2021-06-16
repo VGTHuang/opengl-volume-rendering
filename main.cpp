@@ -1,47 +1,16 @@
 #include <main.h>
 
+const int canvasSize = 512;
+const int transferSize = 512;
 int imageX, imageY, imageZ;
-
-class Timer
-{
-private:
-	// Type aliases to make accessing nested type easier
-	using clock_t = std::chrono::high_resolution_clock;
-	using second_t = std::chrono::duration<double, std::ratio<1> >;
-
-	std::chrono::time_point<clock_t> m_beg;
-
-public:
-	Timer() : m_beg(clock_t::now())
-	{
-	}
-
-	void reset()
-	{
-		m_beg = clock_t::now();
-	}
-
-	double elapsed() const
-	{
-		return std::chrono::duration_cast<second_t>(clock_t::now() - m_beg).count();
-	}
-};
-
-Timer timer;
-
-void printTimer(const char *info) {
-	double a = timer.elapsed();
-	timer.reset();
-	printf("%s %f\n", info, a);
-}
-
-GLuint image3DTexObj, histogramTexObj, renderTexObj, transferTexObj, transferTexObj2, framebuffer, textureColorbuffer;
+GLuint image3DTexObj, histogramTexObj, renderTexObj, transferTexObj, framebufferObj, renderbufferObj, textureColorbufferObj;
 int cubeVAO, planeVAO;
 bool firstRender = true;
 glm::vec4 bg(0.2, 0.2, 0.2, 1.0);
-float opacity = 0.0001;
+float opacity = 0.02;
 int sampleCount = 30;
 
+// get paths to image3D & transfer function; get length, width, height of image3D
 void getImage3DConfig(std::string &image3dPath, std::string &transferPath, int &x, int &y, int &z) {
 	std::string data;
 	std::ifstream rfile;
@@ -53,7 +22,6 @@ void getImage3DConfig(std::string &image3dPath, std::string &transferPath, int &
 	rfile >> x >> y >> z;
 
 	rfile.close();
-
 }
 
 
@@ -73,9 +41,6 @@ void genTexImage3D(unsigned short *imgVals, glm::ivec3 img3DShape) {
 void genHistogram(unsigned short *imgVals, glm::ivec3 img3DShape) {
 	glBindImageTexture(0, image3DTexObj, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R16);
 
-	// output
-	int out_tex_w = 512, out_tex_h = 512;
-
 	glGenTextures(1, &histogramTexObj);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, histogramTexObj);
@@ -83,7 +48,7 @@ void genHistogram(unsigned short *imgVals, glm::ivec3 img3DShape) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, out_tex_w, out_tex_h, 0, GL_RGBA, GL_FLOAT,
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, transferSize, transferSize, 0, GL_RGBA, GL_FLOAT,
 		NULL);
 	glBindImageTexture(1, histogramTexObj, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
@@ -95,17 +60,17 @@ void genHistogram(unsigned short *imgVals, glm::ivec3 img3DShape) {
 	glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
 	// read output texture to cpu
-	float *new_array = (float *)malloc(sizeof(float) * 4 * out_tex_w * out_tex_h);
-	unsigned char *new_array_unsigned_char = (unsigned char *)malloc(sizeof(unsigned char) * 4 * out_tex_w * out_tex_h);
+	float *new_array = (float *)malloc(sizeof(float) * 4 * transferSize * transferSize);
+	unsigned char *new_array_unsigned_char = (unsigned char *)malloc(sizeof(unsigned char) * 4 * transferSize * transferSize);
 
 	glBindTexture(GL_TEXTURE_2D, histogramTexObj);
 	glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, new_array);
 	
-	for (int i = 0; i < out_tex_w * out_tex_h; i++) {
-		int ii = out_tex_w * (out_tex_h - (i / out_tex_h) - 1)  + i % out_tex_h;
-		new_array_unsigned_char[4 * i] = (unsigned char)(new_array[4 * ii] * 255);
-		new_array_unsigned_char[4 * i + 1] = (unsigned char)(new_array[4 * ii + 1] * 255);
-		new_array_unsigned_char[4 * i + 2] = (unsigned char)(new_array[4 * ii + 2] * 255);
+	for (int i = 0; i < transferSize * transferSize; i++) {
+		int j = transferSize * (transferSize - (i / transferSize) - 1)  + i % transferSize;
+		new_array_unsigned_char[4 * i] = (unsigned char)(new_array[4 * j] * 255);
+		new_array_unsigned_char[4 * i + 1] = (unsigned char)(new_array[4 * j + 1] * 255);
+		new_array_unsigned_char[4 * i + 2] = (unsigned char)(new_array[4 * j + 2] * 255);
 		new_array_unsigned_char[4 * i + 3] = 255;
 	}
 
@@ -113,7 +78,7 @@ void genHistogram(unsigned short *imgVals, glm::ivec3 img3DShape) {
 
 	CString histogramSavePath("");
 	OpenWindowsDlg(false, true, true, 0, &histogramSavePath);
-	stbi_write_png(histogramSavePath + "\\histogram.png", out_tex_w, out_tex_h, 4, new_array_unsigned_char, 0);
+	stbi_write_png(histogramSavePath + "\\histogram.png", transferSize, transferSize, 4, new_array_unsigned_char, 0);
 
 	free(new_array);
 	free(new_array_unsigned_char);
@@ -123,22 +88,20 @@ void genHistogram(unsigned short *imgVals, glm::ivec3 img3DShape) {
 void genTransfer(const std::string transferTexPath) {
 	glDeleteTextures(1, &transferTexObj);
 	transferTexObj = TextureLoader::loadTexture(transferTexPath.c_str(), GL_REPEAT);
-	glDeleteTextures(1, &transferTexObj2);
-	transferTexObj2 = TextureLoader::loadTexture("H:/hhx/hhx_works/scientific_visualization_2021/transfer/transfer_test.png", GL_REPEAT);
 }
 
 void genRenderTex() {
 	// output
-	int out_tex_w = 512, out_tex_h = 512;
 	glGenTextures(1, &renderTexObj);
 	glBindTexture(GL_TEXTURE_2D, renderTexObj);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, out_tex_w, out_tex_h, 0, GL_RGBA, GL_FLOAT,
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, canvasSize, canvasSize, 0, GL_RGBA, GL_FLOAT,
 		NULL);
 
+	// https://stackoverflow.com/questions/25252512/how-can-i-pass-multiple-textures-to-a-single-shader
 	// Get the uniform variables location. You've probably already done that before...
 	int transferTexLocation = glGetUniformLocation(renderComputeShader->ID, "transfer");
 	int depthTexLocation = glGetUniformLocation(renderComputeShader->ID, "depth");
@@ -149,33 +112,33 @@ void genRenderTex() {
 	glUniform1i(depthTexLocation, 1);
 }
 
+// https://learnopengl.com/Advanced-OpenGL/Framebuffers
 void genDepthStencilFBO() {
 	// framebuffer configuration
     // -------------------------
-	glGenFramebuffers(1, &framebuffer);
-	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	glGenFramebuffers(1, &framebufferObj);
+	glBindFramebuffer(GL_FRAMEBUFFER, framebufferObj);
 	// create a color attachment texture
-	glGenTextures(1, &textureColorbuffer);
-	glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glGenTextures(1, &textureColorbufferObj);
+	glBindTexture(GL_TEXTURE_2D, textureColorbufferObj);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, canvasSize, canvasSize, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorbuffer, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorbufferObj, 0);
 	// create a renderbuffer object for depth and stencil attachment (we won't be sampling these)
-	unsigned int rbo;
-	glGenRenderbuffers(1, &rbo);
-	glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT); // use a single renderbuffer object for both a depth AND stencil buffer.
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo); // now actually attach it
+	glGenRenderbuffers(1, &renderbufferObj);
+	glBindRenderbuffer(GL_RENDERBUFFER, renderbufferObj);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, canvasSize, canvasSize); // use a single renderbuffer object for both a depth AND stencil buffer.
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, renderbufferObj); // now actually attach it
 	// now that we actually created the framebuffer and added all attachments we want to check if it is actually complete now
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
 }
 
+// https://learnopengl.com/Advanced-OpenGL/Framebuffers
 void renderToDepth() {
-	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, framebufferObj);
 	glEnable(GL_DEPTH_TEST); // enable depth testing (is disabled for rendering screen-space quad)
 
 	glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
@@ -200,24 +163,24 @@ void renderToTex() {
 	glBindImageTexture(1, renderTexObj, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 	clearComputeShader->use();
 	clearComputeShader->setVec4("bg", bg);
-	glDispatchCompute(512, 512, 1);
+	glDispatchCompute(canvasSize, canvasSize, 1);
 
 	
 	glMemoryBarrier(GL_ALL_BARRIER_BITS);
 	glBindImageTexture(1, image3DTexObj, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R16);
 	glBindImageTexture(2, renderTexObj, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-	// glBindImageTexture(3, textureColorbuffer, 0, FALSE, 0, GL_READ_ONLY, GL_R32F);
+	// glBindImageTexture(3, textureColorbufferObj, 0, FALSE, 0, GL_READ_ONLY, GL_R32F);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, transferTexObj);
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
+	glBindTexture(GL_TEXTURE_2D, textureColorbufferObj);
 	int a = glGetError();
 	renderComputeShader->use();
 	renderComputeShader->setVec4("bg", bg);
 	renderComputeShader->setFloat("opacity", opacity);
 	renderComputeShader->setInt("sampleCount", sampleCount);
-	glDispatchCompute(128, 128, 1);
+	glDispatchCompute(canvasSize / 4, canvasSize / 4, 1);
 	
 
 	// glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -261,7 +224,7 @@ int main()
 
 	// glfw window creation
 	// --------------------
-	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "volume rendering", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(canvasSize, canvasSize, "volume rendering", NULL, NULL);
 	if (window == NULL)
 	{
 		std::cout << "Failed to create GLFW window" << std::endl;
@@ -272,7 +235,7 @@ int main()
 
 	// camera
 	glm::vec3 camPos(3.0f, 2.0f, 2.0f);
-	camera = new Camera(camPos, SCR_WIDTH, SCR_HEIGHT, 1.0f, 0.5f);
+	camera = new Camera(camPos, canvasSize, canvasSize, 1.0f, 0.5f);
 
 	// glfw events
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -338,6 +301,7 @@ int main()
 	renderComputeShader->use();
 	renderComputeShader->setInt("maxImgValue", maxImgValue);
 	renderComputeShader->setVec4("bg", bg);
+	renderComputeShader->setFloat("canvasSize", (float)canvasSize);
 	clearComputeShader->use();
 	clearComputeShader->setVec4("bg", bg);
 
@@ -375,9 +339,8 @@ int main()
 	renderComputeShader->setMat4("model", modelMatRender);
 	// set model mat for depthStencilShader
 	glm::mat4 modelMatDepth = glm::mat4(1.0f);
-	modelMatDepth = glm::translate(modelMatDepth, glm::vec3(imageY / (2 * 512.0), imageZ / (2 * 512.0), imageX / (2 * 512.0)));
-	modelMatDepth = glm::scale(modelMatDepth, glm::vec3(imageY / 512.0, imageZ / 512.0, imageX / 512.0));
-	// modelMatDepth = glm::scale(modelMatDepth, glm::vec3((imageY / 512.0, imageZ / 512.0, imageX / 512.0)));
+	// cube coords are at -0.5~0.5; translate it to 0~1
+	modelMatDepth = glm::translate(modelMatDepth, glm::vec3(0.5));
 	depthStencilShader->use();
 	depthStencilShader->setMat4("model", modelMatDepth);
 
@@ -426,7 +389,7 @@ int main()
 				std::cout << transferLoadPath << std::endl;
 				genTransfer(std::string(transferLoadPath));
 			}
-			ImGui::SliderFloat("opacity", &opacity, 0.0001f, 0.01f, "%.4f");
+			ImGui::SliderFloat("opacity", &opacity, 0.001f, 0.1f, "%.3f");
 			ImGui::SliderInt("samples", &sampleCount, 10, 100);
 			ImGui::ColorEdit4("background", (float*)&bg);
 			ImGui::End();
@@ -474,6 +437,14 @@ int main()
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
+
+	glDeleteBuffers(1, &uboMatrices);
+	glDeleteFramebuffers(1, &framebufferObj);
+	glDeleteRenderbuffers(1, &renderbufferObj);
+	glDeleteTextures(1, &image3DTexObj);
+	glDeleteTextures(1, &histogramTexObj);
+	glDeleteTextures(1, &renderTexObj);
+	glDeleteTextures(1, &textureColorbufferObj);
 
 
 	// glfw: terminate, clearing all previously allocated GLFW resources.
