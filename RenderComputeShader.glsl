@@ -17,6 +17,10 @@ uniform int sampleCount;
 float far = 100;
 float near = 0.1;
 
+
+vec3 grad;
+float gradSize;
+
 layout (std140) uniform Matrices
 {
 	mat4 view;
@@ -28,23 +32,33 @@ float getImageData(ivec3 coords) {
 	return imageLoad(imgInput, coords).r * 65536.0 / float(maxImgValue);
 }
 
-float getImageGrad(ivec3 coords) {
+void getImageGrad(ivec3 coords) {
 	float v1 = getImageData(coords + ivec3(-1, 0, 0));
 	float v2 = getImageData(coords + ivec3(1, 0, 0));
 	float v3 = getImageData(coords + ivec3(0, -1, 0));
 	float v4 = getImageData(coords + ivec3(0, 1, 0));
 	float v5 = getImageData(coords + ivec3(0, 0, -1));
 	float v6 = getImageData(coords + ivec3(0, 0, 1));
-	return sqrt(pow((v1-v2)/2.0, 2) + pow((v3-v4)/2.0, 2) + pow((v5-v6)/2.0, 2));
+	grad = vec3(v2-v1, v4-v3, v6-v5) / 2.0;
+	gradSize = distance(grad, vec3(0.0));
 }
 
-vec4 getTransferedVal(ivec3 coords) {
+vec4 getTransferedVal(ivec3 coords, vec3 ray) {
   float value = getImageData(coords);
-  float grad = getImageGrad(coords);
 
   // calc color
-  vec2 transferCoords = vec2(value, grad);
+  vec2 transferCoords = vec2(value, gradSize);
   vec4 transferedColor = texture(transfer, transferCoords);
+
+  /*
+  // ambient
+  vec3 ambient = 0.1 * transferedColor.rgb;
+  // diffuse
+  vec3 diffuse = 0.5 * transferedColor.rgb * max(dot(-ray, grad), 0);
+  // specular
+  vec3 specular = 0.0 * transferedColor.rgb * pow(max(dot(normalize(vec3(1,0,0) - ray), grad), 0), 16);
+  specular = vec3(max(dot(normalize(vec3(1,0,0) - ray), grad), 0));
+  */
 
   return transferedColor;
 
@@ -108,7 +122,7 @@ void main() {
 	vec3 accC = vec3(0);
 	float accA = 0;
 	for(int i = 0; i < sampleCount; i++) {
-		vec4 currentCol = getTransferedVal(ivec3(tempCastPos * canvasSize));
+		vec4 currentCol = getTransferedVal(ivec3(tempCastPos * canvasSize), ray);
 		// C'(i) = (1 - A'(i-1))C(i) + C'(i-1)
 		accC = (1 - accA) * vec3(currentCol) + accC;
 		// A'(i) = (1-A'(i-1)).A(i) + A'(i-1)

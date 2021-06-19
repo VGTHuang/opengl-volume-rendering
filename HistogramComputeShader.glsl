@@ -9,18 +9,22 @@ layout(rgba32f, binding = 1) uniform image2D imgOutput;
 
 uniform int maxImgValue;
 
+vec3 grad;
+float gradSize;
+
 float getImageData(ivec3 coords) {
 	return imageLoad(imgInput, coords).r * 65536.0 / float(maxImgValue);
 }
 
-float getImageGrad(ivec3 coords) {
+void getImageGrad(ivec3 coords) {
 	float v1 = getImageData(coords + ivec3(-1, 0, 0));
 	float v2 = getImageData(coords + ivec3(1, 0, 0));
 	float v3 = getImageData(coords + ivec3(0, -1, 0));
 	float v4 = getImageData(coords + ivec3(0, 1, 0));
 	float v5 = getImageData(coords + ivec3(0, 0, -1));
 	float v6 = getImageData(coords + ivec3(0, 0, 1));
-	return sqrt(pow((v1-v2)/2.0, 2) + pow((v3-v4)/2.0, 2) + pow((v5-v6)/2.0, 2));
+	grad = vec3(v2-v1, v4-v3, v6-v5) / 2.0;
+	gradSize = distance(grad, vec3(0.0));
 }
 
 float getImageLap(ivec3 coords) {
@@ -42,10 +46,10 @@ void main() {
   ivec3 pixel_coords = ivec3(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, gl_GlobalInvocationID.z);
 
   float value =  getImageData(pixel_coords);
-  float grad = getImageGrad(pixel_coords);
+  getImageGrad(pixel_coords);
 
   ivec2 outSize = imageSize(imgOutput);
-  ivec2 outCoords = ivec2(floor(outSize.x * value), floor(outSize.y * grad));
+  ivec2 outCoords = ivec2(floor(outSize.x * value), floor(outSize.y * gradSize));
   
   float originalValue = imageLoad(imgOutput, outCoords).x;
   float increment = pow(100, -1 / (1 - 1.1 * originalValue));
