@@ -5,8 +5,7 @@ const int transferSize = 512;
 int imageX, imageY, imageZ;
 GLuint image3DTexObj, histogramTexObj, renderTexObj, transferTexObj, framebufferObj, renderbufferObj, textureColorbufferObj;
 int cubeVAO, planeVAO;
-bool firstRender = true;
-glm::vec4 bg(0.2, 0.2, 0.2, 1.0);
+glm::vec4 bg(0.06, 0.06, 0.06, 1.0);
 float opacity = 0.02;
 int sampleCount = 30;
 
@@ -189,8 +188,8 @@ void renderToTex() {
 }
 
 
-// int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
-int main()
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+// int main()
 {
 	// config
 	std::string image3DPath, transferPath;
@@ -333,10 +332,6 @@ int main()
 	unsigned int depthMatrices = glGetUniformBlockIndex(depthStencilShader->ID, "Matrices");
 	glUniformBlockBinding(depthStencilShader->ID, depthMatrices, 0);
 
-	// set model mat for renderComputeShader
-	glm::mat4 modelMatRender = glm::mat4(1.0f);
-	renderComputeShader->use();
-	renderComputeShader->setMat4("model", modelMatRender);
 	// set model mat for depthStencilShader
 	glm::mat4 modelMatDepth = glm::mat4(1.0f);
 	// cube coords are at -0.5~0.5; translate it to 0~1
@@ -389,8 +384,8 @@ int main()
 				std::cout << transferLoadPath << std::endl;
 				genTransfer(std::string(transferLoadPath));
 			}
-			ImGui::SliderFloat("opacity", &opacity, 0.001f, 0.1f, "%.3f");
-			ImGui::SliderInt("samples", &sampleCount, 10, 100);
+			ImGui::SliderFloat("opacity", &opacity, 0.001f, 0.5f, "%.3f");
+			ImGui::SliderInt("samples", &sampleCount, 10, 300);
 			ImGui::ColorEdit4("background", (float*)&bg);
 			ImGui::End();
 		}
@@ -403,8 +398,6 @@ int main()
 		lastFrame = currentFrame;
 
 		processInput(window);
-
-		
 
 		glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

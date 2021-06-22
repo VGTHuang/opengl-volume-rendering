@@ -73,6 +73,10 @@
     <IncludePath>H:\hhx\hhx_works\opengl\resources\glm-0.9.9.8\glm-0.9.9.8;H:\hhx\hhx_works\opengl\includes;$(IncludePath)</IncludePath>
     <LibraryPath>H:\hhx\hhx_works\opengl\libs;H:\hhx\hhx_tools\imebra_5_2_1_2\build\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>H:\hhx\hhx_works\opengl\resources\glm-0.9.9.8\glm-0.9.9.8;H:\hhx\hhx_works\opengl\includes;$(IncludePath)</IncludePath>
+    <LibraryPath>H:\hhx\hhx_works\opengl\libs;H:\hhx\hhx_tools\imebra_5_2_1_2\build\Debug;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -120,11 +124,14 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>H:\hhx\hhx_works\scientific_visualization_2021\marching_cubes\marching_cubes\imgui;H:\hhx\hhx_works\scientific_visualization_2021\volume_rendering\volume_rendering;H:\hhx\hhx_works\opengl\headers</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>opengl32.lib;glfw3.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

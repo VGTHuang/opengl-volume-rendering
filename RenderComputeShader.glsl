@@ -9,7 +9,6 @@ uniform sampler2D depth;
 
 uniform float canvasSize;
 uniform int maxImgValue;
-uniform mat4 model;
 uniform vec4 bg;
 uniform float opacity;
 uniform int sampleCount;
@@ -27,6 +26,10 @@ layout (std140) uniform Matrices
 	mat4 projection;
 	vec3 camPos;
 };
+
+// pre-calc inverse
+mat4 invView;
+mat4 invProjection;
 
 float getImageData(ivec3 coords) {
 	return imageLoad(imgInput, coords).r * 65536.0 / float(maxImgValue);
@@ -66,7 +69,7 @@ vec4 getTransferedVal(ivec3 coords, vec3 ray) {
 
 // https://antongerdelan.net/opengl/raycasting.html
 vec3 getRay(vec2 pxPos) {
-	vec3 ray = (inverse(view) * inverse(projection) * vec4(pxPos * (far - near), far + near, far - near)).xyz;
+	vec3 ray = (invView * invProjection * vec4(pxPos * (far - near), far + near, far - near)).xyz;
 	return ray;
 }
 
@@ -97,6 +100,8 @@ void main() {
 		imageStore(imgOutput, ivec2(fakeFragCoord), blendColor);
 	*/
 	
+	invView = inverse(view);
+	invProjection = inverse(projection);
 
 	vec4 depthIndicator = texture(depth, vec2(float(gl_GlobalInvocationID.x) / canvasSize, float(gl_GlobalInvocationID.y) / canvasSize));
 	/*

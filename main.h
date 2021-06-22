@@ -80,8 +80,8 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
 	// make sure the viewport matches the new window dimensions; note that width and 
 	// height will be significantly larger than specified on retina displays.
-	glViewport(0, 0, width, height);
-	camera->ResizeCallback(width, height);
+	// glViewport(0, 0, width, height);
+	// camera->ResizeCallback(width, height);
 }
 
 void createSSBO(GLuint &newSSBO, const int memSize, const int bindingIndex, void *buffer, Shader *shader, const char *storageBlockName)
