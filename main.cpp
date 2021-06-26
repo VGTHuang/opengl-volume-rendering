@@ -6,7 +6,7 @@ int imageX, imageY, imageZ;
 GLuint image3DTexObj, histogramTexObj, renderTexObj, transferTexObj, framebufferObj, renderbufferObj, textureColorbufferObj;
 int cubeVAO, planeVAO;
 glm::vec4 bg(0.06, 0.06, 0.06, 1.0);
-float opacity = 0.02;
+float opacity = 1.0;
 int sampleCount = 30;
 
 // get paths to image3D & transfer function; get length, width, height of image3D
@@ -384,7 +384,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				std::cout << transferLoadPath << std::endl;
 				genTransfer(std::string(transferLoadPath));
 			}
-			ImGui::SliderFloat("opacity", &opacity, 0.001f, 0.5f, "%.3f");
+			ImGui::SliderFloat("opacity", &opacity, 0.01f, 10.0f, "%.2f");
 			ImGui::SliderInt("samples", &sampleCount, 10, 300);
 			ImGui::ColorEdit4("background", (float*)&bg);
 			ImGui::End();

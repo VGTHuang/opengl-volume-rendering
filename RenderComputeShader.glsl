@@ -48,22 +48,29 @@ void getImageGrad(ivec3 coords) {
 
 vec4 getTransferedVal(ivec3 coords, vec3 ray) {
   float value = getImageData(coords);
+	getImageGrad(coords);
 
   // calc color
   vec2 transferCoords = vec2(value, gradSize);
   vec4 transferedColor = texture(transfer, transferCoords);
 
-  /*
+  
   // ambient
-  vec3 ambient = 0.1 * transferedColor.rgb;
+  vec3 ambient = 0.1 * transferedColor.xyz;
   // diffuse
-  vec3 diffuse = 0.5 * transferedColor.rgb * max(dot(-ray, grad), 0);
+  vec3 diffuse = 0.5 * transferedColor.xyz * max(dot(-ray, grad), 0);
   // specular
-  vec3 specular = 0.0 * transferedColor.rgb * pow(max(dot(normalize(vec3(1,0,0) - ray), grad), 0), 16);
+  vec3 specular = 0.0 * transferedColor.xyz * pow(max(dot(normalize(vec3(1,0,0) - ray), grad), 0), 16);
   specular = vec3(max(dot(normalize(vec3(1,0,0) - ray), grad), 0));
-  */
-
-  return transferedColor;
+  
+	// if(gradSize > 0.1) {
+	// 	return vec4(1.0, 1.0, 0.0, 1.0);
+	// }
+	// else {
+	// 	return vec4(0);
+	// }
+  // return transferedColor;
+  return vec4(ambient + diffuse + specular, transferedColor.w);
 
 }
 
@@ -129,16 +136,18 @@ void main() {
 	for(int i = 0; i < sampleCount; i++) {
 		vec4 currentCol = getTransferedVal(ivec3(tempCastPos * canvasSize), ray);
 		// C'(i) = (1 - A'(i-1))C(i) + C'(i-1)
-		accC = (1 - accA) * vec3(currentCol) + accC;
+		accC = (1 - accA) * currentCol.xyz * currentCol.w + accC;
 		// A'(i) = (1-A'(i-1)).A(i) + A'(i-1)
 		accA = (1 - accA) * currentCol.w * opacity / sampleCount + accA;
-		if(accA >= 0.5) {
+		if(accA >= 1.0) {
 			break;
 		}
 		tempCastPos += ray / (0.6 * sampleCount);
 	}
-	if(depthIndicator.z > 0.1)
-		imageStore(imgOutput, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), vec4(vec3(bg) * (1 - accA) + accC * accA, 1));
+	if(depthIndicator.z > 0.1) {
+		imageStore(imgOutput, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), vec4(bg.xyz * (1 - accA) + accC * accA, 1));
+		// imageStore(imgOutput, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), vec4(accC, 1.0));
+	}
 
 	
 	/*
