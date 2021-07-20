@@ -16,7 +16,6 @@ uniform int sampleCount;
 float far = 100;
 float near = 0.1;
 
-
 vec3 grad;
 float gradSize;
 
@@ -32,7 +31,7 @@ mat4 invView;
 mat4 invProjection;
 
 float getImageData(ivec3 coords) {
-	return imageLoad(imgInput, coords).r * 65536.0 / float(maxImgValue);
+	return imageLoad(imgInput, ivec3(coords.z, coords.x, coords.y)).r * 65536.0 / float(maxImgValue);
 }
 
 void getImageGrad(ivec3 coords) {
@@ -53,22 +52,17 @@ vec4 getTransferedVal(ivec3 coords, vec3 ray) {
   // calc color
   vec2 transferCoords = vec2(value, gradSize);
   vec4 transferedColor = texture(transfer, transferCoords);
-
+  vec3 lightDir = vec3(1.0, 0.0, 0.0);
+  vec3 lightCol = vec3(1.0, 1.0, 1.0);
   
   // ambient
   vec3 ambient = 0.1 * transferedColor.xyz;
   // diffuse
-  vec3 diffuse = 0.5 * transferedColor.xyz * max(dot(-ray, grad), 0);
+  vec3 diffuse = 1 * max(dot(lightDir, grad), 0) * lightCol;
   // specular
-  vec3 specular = 0.0 * transferedColor.xyz * pow(max(dot(normalize(vec3(1,0,0) - ray), grad), 0), 16);
-  specular = vec3(max(dot(normalize(vec3(1,0,0) - ray), grad), 0));
+  vec3 specular = 0.5 * pow(max(dot(lightDir, grad), 0), 16) * lightCol;
+  // specular = vec3(max(dot(normalize(vec3(1,0,0) - ray), grad), 0));
   
-	// if(gradSize > 0.1) {
-	// 	return vec4(1.0, 1.0, 0.0, 1.0);
-	// }
-	// else {
-	// 	return vec4(0);
-	// }
   // return transferedColor;
   return vec4(ambient + diffuse + specular, transferedColor.w);
 
@@ -111,6 +105,7 @@ void main() {
 	invProjection = inverse(projection);
 
 	vec4 depthIndicator = texture(depth, vec2(float(gl_GlobalInvocationID.x) / canvasSize, float(gl_GlobalInvocationID.y) / canvasSize));
+	
 	/*
 	// draw a red bbox of the rendered volume for testing
 	vec4 originalPxValue1 = imageLoad(imgOutput, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y));
@@ -138,13 +133,16 @@ void main() {
 		// C'(i) = (1 - A'(i-1))C(i) + C'(i-1)
 		accC = (1 - accA) * currentCol.xyz * currentCol.w + accC;
 		// A'(i) = (1-A'(i-1)).A(i) + A'(i-1)
-		accA = (1 - accA) * currentCol.w * opacity / sampleCount + accA;
-		if(accA >= 1.0) {
+		accA = (1 - accA) * currentCol.w * opacity + accA;
+		if(accA >= 1) {
 			break;
 		}
 		tempCastPos += ray / (0.6 * sampleCount);
 	}
 	if(depthIndicator.z > 0.1) {
+		// so that rendered opacity does not decrease with fewer points sampled (loop exited earlier)
+		// times 10 because ambient has a factor of 0.1
+		accA *= opacity * 10;
 		imageStore(imgOutput, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), vec4(bg.xyz * (1 - accA) + accC * accA, 1));
 		// imageStore(imgOutput, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), vec4(accC, 1.0));
 	}
